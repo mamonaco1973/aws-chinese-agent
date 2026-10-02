@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MicroVM Agent Sandbox</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Inter webfont — matches ChatGPT's UI typeface -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/styles.css">
+  <!-- Apply saved theme before first paint to prevent a light flash (theme.js) -->
+  <script>
+    (function(){
+      var p="system";
+      try{p=localStorage.getItem("sa-theme")||"system";}catch(e){}
+      var t=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;
+      document.documentElement.setAttribute("data-theme",t);
+    })();
+  </script>
+</head>
+
+<body>
+
+  <!-- ================================================================ -->
+  <!-- App shell — sidebar + main                                       -->
+  <!-- ================================================================ -->
+
+  <div id="app-shell" class="hidden">
+
+    <!-- ============================================================== -->
+    <!-- Left sidebar                                                    -->
+    <!-- ============================================================== -->
+
+    <aside id="sidebar">
+
+      <!-- Brand row: icon, app name, and collapse toggle -->
+      <div id="sidebar-brand">
+        <div class="sidebar-brand-inner">
+          <span class="sidebar-brand-icon-wrap">
+            <!-- A cube: the sandbox the agent works in -->
+            <svg class="sidebar-brand-icon" viewBox="0 0 24 24" width="18" height="18"
+                 fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2.5 20.5 7v10L12 21.5 3.5 17V7z"/>
+              <path d="M3.5 7 12 11.5 20.5 7"/>
+              <path d="M12 11.5v10"/>
+            </svg>
+          </span>
+          <span class="sidebar-brand-name">MicroVM Agent Sandbox</span>
+        </div>
+        <button id="btn-sidebar-collapse" class="sidebar-icon-btn" title="Close sidebar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="sidebar-header">
+        <button id="btn-new-chat" class="new-chat-btn" title="New chat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          New chat
+        </button>
+        <a href="https://github.com/mamonaco1973" target="_blank" rel="noopener"
+           class="sidebar-link-btn" title="Open GitHub repositories">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61
+                     c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77
+                     5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0
+                     0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77
+                     5.44 5.44 0 0 0 3.5 8.55c0 5.42 3.3 6.61 6.44 7
+                     A3.37 3.37 0 0 0 9 18.13V22"/>
+          </svg>
+          Open GitHub
+        </a>
+        <a href="https://youtube.com/@MikesCloudSolutions" target="_blank" rel="noopener"
+           class="sidebar-link-btn sidebar-link-btn--yt" title="Open YouTube channel">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.54 3.5 12 3.5 12
+                     3.5s-7.54 0-9.38.55A3.02 3.02 0 0 0 .5 6.19C0 8.04 0 12 0
+                     12s0 3.96.5 5.81a3.02 3.02 0 0 0 2.12 2.14C4.46 20.5 12
+                     20.5 12 20.5s7.54 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14C24
+                     15.96 24 12 24 12s0-3.96-.5-5.81z"/>
+            <polygon points="9.75 15.02 15.5 12 9.75 8.98 9.75 15.02" fill="white"/>
+          </svg>
+          Open YouTube
+        </a>
+        <a href="https://www.linkedin.com/in/michael-monaco/" target="_blank" rel="noopener"
+           class="sidebar-link-btn sidebar-link-btn--li" title="Open LinkedIn profile">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037
+                     -1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046
+                     c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286z
+                     M5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1
+                     2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452z
+                     M22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24
+                     1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774
+                     23.2 0 22.222 0h.003z"/>
+          </svg>
+          Open LinkedIn
+        </a>
+        <a href="https://github.com/mamonaco1973/aws-microvm-agent-sandbox" target="_blank" rel="noopener"
+           class="sidebar-link-btn sidebar-link-btn--build" title="Build this application">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"/>
+            <polyline points="8 6 2 12 8 18"/>
+          </svg>
+          Build This Application
+        </a>
+      </div>
+
+      <nav id="conv-list">
+        <!-- Rendered by sidebar.js -->
+      </nav>
+
+      <div id="sidebar-footer">
+
+        <!-- User menu — trigger + popup, wired in app.js.
+             The token ring wraps the avatar; usage appears as a subtitle. -->
+        <div id="user-menu-container" class="hidden">
+          <button id="user-menu-trigger" class="user-menu-trigger">
+            <div class="user-avatar-wrap">
+              <svg class="user-avatar-ring-svg" viewBox="0 0 36 36">
+                <circle class="token-ring-bg"  cx="18" cy="18" r="15.9"/>
+                <circle class="token-ring-arc" id="token-ring-arc"
+                        cx="18" cy="18" r="15.9" pathLength="100"
+                        stroke-dasharray="0 100" stroke-dashoffset="25"/>
+              </svg>
+              <span id="user-menu-avatar" class="user-menu-avatar">?</span>
+            </div>
+
+            <span class="user-menu-info">
+              <span id="user-menu-name"    class="user-menu-name"></span>
+              <span id="token-usage-label" class="user-menu-token-label"></span>
+            </span>
+
+            <svg class="user-menu-chevron" xmlns="http://www.w3.org/2000/svg"
+                 width="14" height="14" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+
+          <div id="user-menu-popup" class="user-menu-popup hidden">
+            <div class="user-menu-email-row">
+              <span class="user-menu-popup-avatar" id="user-menu-popup-avatar"></span>
+              <span class="user-menu-email" id="user-menu-email"></span>
+            </div>
+            <div class="user-menu-divider"></div>
+            <!-- Help expands inline to show doc links -->
+            <button id="user-menu-help-toggle" class="user-menu-item user-menu-item--expandable">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              Help
+              <svg class="user-menu-expand-chevron"
+                   xmlns="http://www.w3.org/2000/svg" width="13" height="13"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+            <div id="help-submenu" class="user-menu-submenu hidden">
+              <a href="https://github.com/mamonaco1973/aws-microvm-agent-sandbox#readme"
+                 target="_blank" rel="noopener noreferrer" class="user-menu-subitem">
+                How it works
+              </a>
+              <a href="https://github.com/mamonaco1973/aws-microvm-agent-sandbox#try-it"
+                 target="_blank" rel="noopener noreferrer" class="user-menu-subitem">
+                Things to try
+              </a>
+              <a href="https://github.com/mamonaco1973/aws-lambda-microvms"
+                 target="_blank" rel="noopener noreferrer" class="user-menu-subitem">
+                Lambda MicroVMs project
+              </a>
+            </div>
+            <button id="user-menu-settings" class="user-menu-item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83
+                         2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0
+                         0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9
+                         19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+                         l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3
+                         a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0
+                         0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65
+                         0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4
+                         0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33
+                         l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0
+                         19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65
+                         1.65 0 0 0-1.51 1z"/>
+              </svg>
+              Settings
+            </button>
+            <div class="user-menu-divider"></div>
+            <button id="user-menu-signout" class="user-menu-item user-menu-item--danger">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/>
+                <line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </aside>
+
+    <!-- ============================================================== -->
+    <!-- Sidebar overlay — mobile only, dims content behind open sidebar -->
+    <!-- ============================================================== -->
+
+    <div id="sidebar-overlay"></div>
+
+    <!-- ============================================================== -->
+    <!-- Main chat area                                                  -->
+    <!-- ============================================================== -->
+
+    <main id="chat-main">
+
+      <!-- Desktop: avatar shown at bottom-left when the sidebar is collapsed -->
+      <button id="user-avatar-collapsed" class="user-avatar-collapsed" title="Account">
+        <div class="user-avatar-wrap">
+          <svg class="user-avatar-ring-svg" viewBox="0 0 36 36">
+            <circle class="token-ring-bg" cx="18" cy="18" r="15.9"/>
+            <circle class="token-ring-arc" id="token-ring-arc-collapsed"
+                    cx="18" cy="18" r="15.9" pathLength="100"
+                    stroke-dasharray="0 100" stroke-dashoffset="25"/>
+          </svg>
+          <span id="user-avatar-collapsed-initial" class="user-menu-avatar">?</span>
+        </div>
+      </button>
+
+      <!-- Desktop: open + new-chat controls shown when the sidebar is collapsed -->
+      <div id="sidebar-collapsed-controls" class="sidebar-collapsed-controls">
+        <button id="btn-sidebar-open" class="sidebar-icon-btn" title="Open sidebar">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+          </svg>
+        </button>
+        <button id="btn-new-chat-collapsed" class="sidebar-icon-btn" title="New chat">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="mobile-topbar">
+        <button id="sidebar-toggle" title="Menu">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span id="mobile-topbar-title">MicroVM Agent Sandbox</span>
+      </div>
+
+      <!-- Boot spinner — shown while conversations and usage load, so the empty
+           state doesn't flash in and then get replaced (see app.js boot). -->
+      <div id="boot-spinner" aria-hidden="true">
+        <div class="boot-spinner-ring"></div>
+      </div>
+
+      <!-- Empty state — shown when no conversation is selected. Starts hidden;
+           boot() reveals it once the workspace has loaded. -->
+      <div id="empty-state" class="hidden">
+        <div class="empty-logo">MicroVM Agent Sandbox</div>
+        <p class="empty-tagline">
+          A coding agent with its own Lambda MicroVM. It writes Python, runs it in a private sandbox, looks at what it drew, and hands you the result — expand the trace to watch it work.
+        </p>
+        <div class="starter-grid">
+          <button class="starter-btn" data-q="Build me a fractal tree and get me the results">Build me a fractal tree</button>
+          <button class="starter-btn" data-q="Draw a spirograph in my sandbox: R=220, r=65, d=140, inferno colormap along the curve, black background, no axes.">Draw a spirograph</button>
+          <button class="starter-btn" data-q="Plot the Lorenz attractor in my sandbox, x vs z, inferno colormap along the trajectory, black background, no axes.">Plot the Lorenz attractor</button>
+          <button class="starter-btn" data-q="Install git in the sandbox, clone https://github.com/mamonaco1973/aws-lambda-microvms, and tell me how many lines of Python and Terraform it has.">Clone a repo and count its code</button>
+          <button class="starter-btn" data-q="What is your sandbox? Show me its OS, kernel, Python version, CPU count and memory.">What is your sandbox?</button>
+          <button class="starter-btn" data-q="Install pandas in the sandbox, then build a small made-up sales dataset and chart revenue by month.">pip install pandas and chart data</button>
+        </div>
+      </div>
+
+      <!-- Chat log — shown when a conversation is active -->
+      <div id="chat-log" class="hidden">
+        <!-- Messages rendered by chat.js -->
+      </div>
+
+      <!-- Input bar -->
+      <div id="input-bar">
+        <div id="input-wrapper">
+          <textarea
+            id="chat-input"
+            placeholder="Ask it to build, compute, or draw something — it runs the code in its own MicroVM…"
+            rows="1"
+            maxlength="4000"
+          ></textarea>
+          <button id="btn-send" title="Send">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <p id="input-error" class="input-error hidden"></p>
+      </div>
+
+    </main>
+
+  </div><!-- /#app-shell -->
+
+  <!-- ================================================================ -->
+  <!-- Sign-in modal                                                    -->
+  <!-- ================================================================ -->
+
+  <div id="sign-in-modal" class="modal hidden">
+    <div class="modal-content--auth">
+
+      <div class="auth-preview-panel">
+        <div class="auth-preview-inner">
+          <div class="auth-preview-logo">MicroVM Agent Sandbox</div>
+          <p class="auth-preview-tagline">
+            A coding agent with its own Lambda MicroVM.
+          </p>
+          <ul class="auth-preview-features">
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Writes and runs Python in a private Firecracker VM
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Returns the images it renders, right in the chat
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Watch every cell it runs in the trace
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Sandbox state survives suspend and resume
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="auth-form-panel">
+        <h2>MicroVM Agent Sandbox</h2>
+        <p class="auth-form-desc">
+          Sign in to chat with a coding agent. Each conversation gets its own
+          Lambda MicroVM, launched the first time the agent needs to run code.
+        </p>
+        <div class="auth-form-actions">
+          <button type="button" id="btn-cognito-sign-in">Sign In</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Settings dialog                                                   -->
+  <!-- ================================================================ -->
+
+  <div id="settings-modal" class="modal hidden">
+    <div class="settings-dialog">
+
+      <div class="settings-nav">
+        <button id="settings-close" class="settings-close-btn" title="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6"  y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+        <button class="settings-nav-item active" data-panel="appearance">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+               viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1"  x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22"   x2="5.64"  y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1"  y1="12" x2="3"  y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22"  y1="19.78" x2="5.64"  y2="18.36"/>
+            <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
+          </svg>
+          Appearance
+        </button>
+      </div>
+
+      <div class="settings-body">
+        <div id="settings-panel-appearance" class="settings-panel">
+          <h2 class="settings-panel-title">Appearance</h2>
+          <div class="settings-row settings-row--col">
+            <span class="settings-row-label">Theme</span>
+            <div class="theme-picker">
+              <button class="theme-option" data-theme="light">
+                <span class="theme-swatch theme-swatch--light"></span>
+                Light
+              </button>
+              <button class="theme-option" data-theme="dark">
+                <span class="theme-swatch theme-swatch--dark"></span>
+                Dark
+              </button>
+              <button class="theme-option" data-theme="system">
+                <span class="theme-swatch theme-swatch--system"></span>
+                System
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Alert modal                                                       -->
+  <!-- ================================================================ -->
+
+  <div id="alert-modal" class="modal hidden">
+    <div class="modal-content modal-content--sm">
+      <h2 id="alert-modal-title">Notice</h2>
+      <p id="alert-modal-message" class="modal-message"></p>
+      <div class="modal-actions">
+        <button type="button" id="alert-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Confirm modal                                                     -->
+  <!-- ================================================================ -->
+
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-content modal-content--sm">
+      <h2 id="confirm-modal-title">Confirm</h2>
+      <p id="confirm-modal-message" class="modal-message"></p>
+      <div class="modal-actions">
+        <button type="button" id="confirm-modal-cancel" class="btn-secondary">Cancel</button>
+        <button type="button" id="confirm-modal-ok">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Load application                                                  -->
+  <!-- ================================================================ -->
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+
+</body>
+</html>

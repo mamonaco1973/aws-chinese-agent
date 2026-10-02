@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Signing In...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <p>Signing in...</p>
+
+  <script type="module">
+    import {
+      exchangeCodeForTokens,
+      storeTokens,
+      getPostLoginRedirectUrl
+    } from "./js/auth.js";
+
+    async function main() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (!code) {
+        window.alert("Missing authorization code.");
+        window.location.href = "/index.html";
+        return;
+      }
+
+      try {
+        const tokens = await exchangeCodeForTokens(code);
+        storeTokens(tokens);
+        window.location.href = getPostLoginRedirectUrl();
+      } catch (error) {
+        console.error("Login failed:", error);
+        window.alert(`Login failed: ${error.message}`);
+        window.location.href = "/index.html";
+      }
+    }
+
+    main();
+  </script>
+</body>
+</html>
