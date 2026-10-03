@@ -458,10 +458,17 @@ def _hydrate_query(item):
         mime = artifact.get("mime") or "application/octet-stream"
         params = {"Bucket": BACKEND_BUCKET, "Key": artifact["key"],
                   "ResponseContentType": mime}
-        # Only raster images render inline. Anything else downloads, so a
-        # generated HTML or SVG file is never executed by the browser.
-        if mime not in ("image/png", "image/jpeg", "image/gif", "image/webp"):
-            name = str(artifact.get("name") or "file").replace('"', "")
+        name = str(artifact.get("name") or "file").replace('"', "")
+        # HTML the agent builds (a game, a page) opens in a new tab so it can
+        # run. That is safe to allow: the link is an S3 URL, a different
+        # origin from the app, so the page cannot reach the user's session or
+        # tokens, and the link expires. Raster images render inline too.
+        # Everything else -- SVG included -- downloads rather than executes.
+        is_html = mime == "text/html" or name.lower().endswith((".html", ".htm"))
+        if is_html:
+            params["ResponseContentType"] = "text/html; charset=utf-8"
+            params["ResponseContentDisposition"] = f'inline; filename="{name}"'
+        elif mime not in ("image/png", "image/jpeg", "image/gif", "image/webp"):
             params["ResponseContentDisposition"] = f'attachment; filename="{name}"'
         try:
             url = s3_presign.generate_presigned_url(

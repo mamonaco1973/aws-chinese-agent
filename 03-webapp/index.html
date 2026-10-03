@@ -301,12 +301,35 @@
       <div id="empty-state" class="hidden">
         <div class="empty-logo">MicroVM Agent Sandbox</div>
         <p class="empty-tagline">
-          A coding agent with its own Lambda MicroVM. It writes Python, runs it in a private sandbox, looks at what it drew, and hands you the result — expand the trace to watch it work.
+          A coding agent with its own Lambda MicroVM.
         </p>
         <div class="starter-grid">
           <button class="starter-btn" data-q="Build me a fractal tree and get me the results">Build me a fractal tree</button>
           <button class="starter-btn" data-q="Draw a spirograph in my sandbox: R=220, r=65, d=140, inferno colormap along the curve, black background, no axes.">Draw a spirograph</button>
-          <button class="starter-btn" data-q="Plot the Lorenz attractor in my sandbox, x vs z, inferno colormap along the trajectory, black background, no axes.">Plot the Lorenz attractor</button>
+          <button class="starter-btn" data-q="Build a complete Breakout game as a single self-contained HTML file.
+
+Requirements:
+- One file only. Inline CSS and inline JavaScript. No external libraries,
+  no CDN links, no separate .js or .css files.
+- 800x600 &lt;canvas&gt;, centred on a dark page background.
+- Paddle at the bottom, controlled ONLY by the left/right arrow keys -- no
+  mouse control. Move it smoothly while a key is held, and clamp it to the
+  canvas edges.
+- A ball that bounces off the walls, the paddle, and the bricks. Angle the
+  bounce based on where the ball hits the paddle.
+- 5 rows x 10 columns of bricks, a different colour per row. Each brick is
+  a separate rectangle with a visible 4px gap between neighbouring bricks,
+  both horizontally and vertically (compute the brick width from the canvas
+  width minus the gaps and side margins). Give each brick a thin darker
+  outline so individual bricks are obvious even within one colour row.
+- Score (+10 per brick) and 3 lives, both drawn on the canvas.
+- Losing the ball costs a life and resets the ball on the paddle.
+- &quot;YOU WIN&quot; when every brick is cleared, &quot;GAME OVER&quot; at zero lives, and in
+  both cases press SPACE to restart.
+- Use requestAnimationFrame for the game loop.
+
+Write it to breakout.html in the sandbox with Python, check the file exists
+and how big it is, then call show_file on it. Do not print the code in chat.">Build the game Breakout</button>
           <button class="starter-btn" data-q="Install R and produce a sample pie chart of some random sales data by region">Install R and make a pie chart</button>
           <button class="starter-btn" data-q="What is your sandbox? Show me its OS, kernel, Python version, CPU count and memory.">What is your sandbox?</button>
           <button class="starter-btn" data-q="Install pandas in the sandbox, then build a small made-up sales dataset and chart revenue by month.">pip install pandas and chart data</button>
@@ -327,9 +350,11 @@
             rows="1"
             maxlength="4000"
           ></textarea>
-          <!-- Model selector, inline before send (same placement as
-               mycorpus-runtime). Filled by app.js from GET /models; disabled
-               once the chat's first message locks its model. -->
+          <!-- Toolbar under the text, ChatGPT-style: it stays pinned at the
+               bottom of the box however tall the text grows. Model pill on
+               the left (filled by app.js from GET /models; disabled once the
+               chat's first message locks its model), send on the right. -->
+          <div id="input-toolbar">
           <select id="model-picker" class="model-selector-select hidden"
                   title="Model for this conversation"></select>
           <button id="btn-send" title="Send">
@@ -340,6 +365,7 @@
               <polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
           </button>
+          </div>
         </div>
         <p id="input-error" class="input-error hidden"></p>
       </div>

@@ -570,10 +570,12 @@ function _storageSet(key, value) {
   try { localStorage.setItem(key, value); } catch { /* not persisted */ }
 }
 
+// Grow with the text up to 40% of the window (the CSS max-height), then
+// scroll inside the box.
 function _autoResize() {
   const ta = document.getElementById("chat-input");
   ta.style.height = "auto";
-  ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+  ta.style.height = `${Math.min(ta.scrollHeight, Math.round(window.innerHeight * 0.4))}px`;
 }
 
 /* ---------------------------------------------------------------------------- */

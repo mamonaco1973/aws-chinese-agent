@@ -71,7 +71,9 @@
 [data-theme="dark"] #input-wrapper      { border-color: var(--border); }
 [data-theme="dark"] #input-wrapper:focus-within { border-color: #555555; }
 [data-theme="dark"] #conv-list::-webkit-scrollbar-thumb,
-[data-theme="dark"] #chat-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+[data-theme="dark"] #chat-log::-webkit-scrollbar-thumb,
+[data-theme="dark"] #chat-input::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+[data-theme="dark"] #chat-input { scrollbar-color: rgba(255,255,255,0.15) transparent; }
 
 /* ============================================================================ */
 /* Reset                                                                         */
@@ -542,10 +544,19 @@ ul { list-style: none; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* Centred with auto margins on the first and last child, not
+     justify-content: center -- when the content is taller than the space
+     (150% zoom, a short window), centring pushed it off the top where no
+     scrollbar could reach it. This centres when it fits and scrolls from the
+     top when it does not. */
+  justify-content: flex-start;
+  overflow-y: auto;
+  min-height: 0;
   padding: 40px 24px;
   gap: 16px;
 }
+#empty-state > :first-child { margin-top: auto; }
+#empty-state > :last-child  { margin-bottom: auto; }
 
 .empty-logo {
   font-size: 1.73rem;
@@ -629,6 +640,10 @@ ul { list-style: none; }
   border-radius: 18px 18px 4px 18px;
   padding: 10px 16px;
   color: var(--text-primary);
+  /* Keep the line breaks and indentation the user typed (a multi-line
+     prompt read as one run-on paragraph), while still wrapping long lines. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .msg-row--assistant .msg-bubble {
@@ -911,16 +926,20 @@ ul { list-style: none; }
 }
 .model-selector-select:disabled:hover { background-color: var(--bg-hover); color: var(--text-muted); }
 
+/* Two rows, ChatGPT-style: the text on top, a toolbar (model, send) pinned
+   underneath. Only the text grows, so the buttons never move or float in
+   the middle of a tall box. */
 #input-wrapper {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   width: 100%;
   max-width: var(--input-max);
   background: var(--bg-input);
   border: 1px solid #e0e0e0;
-  border-radius: 28px;
-  padding: 12px 12px 12px 20px;
+  border-radius: 24px;
+  padding: 14px 12px 10px 20px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -930,8 +949,13 @@ ul { list-style: none; }
 }
 
 #chat-input {
-  flex: 1;
-  max-height: 200px;
+  width: 100%;
+  /* Grows with the text up to 40% of the window, then scrolls inside --
+     _autoResize uses the same limit. The right padding keeps the slim
+     scrollbar off the box's rounded edge. */
+  max-height: 40vh;
+  padding-right: 8px;
+  resize: none;
   overflow-y: auto;
   line-height: 1.5;
   font-size: 1rem;
@@ -939,9 +963,30 @@ ul { list-style: none; }
 }
 #chat-input::placeholder { color: var(--text-muted); }
 
+/* Slim scrollbar for a long pasted prompt, matching the chat log's, instead
+   of the browser's default bar inside the rounded box. */
+#chat-input { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.15) transparent; }
+#chat-input::-webkit-scrollbar { width: 4px; }
+#chat-input::-webkit-scrollbar-track { background: transparent; }
+#chat-input::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+
 /* Room for five lines of prompt at all times -- a multi-line request reads
    better than one line that scrolls. _autoResize still grows it to max-height. */
 #chat-input { min-height: 7.5em; }
+
+/* Short windows (high zoom on a laptop): three lines, so the prompt does not
+   crowd out the conversation or the starter questions. */
+@media (max-height: 760px) {
+  #chat-input { min-height: 4.5em; }
+}
+
+/* Model pill and send grouped at the right, pill just left of send. */
+#input-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 #btn-send {
   flex-shrink: 0;

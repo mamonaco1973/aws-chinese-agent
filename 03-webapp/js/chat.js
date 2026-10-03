@@ -361,6 +361,16 @@ function _buildFiles(files) {
       img.loading = "lazy";
       link.appendChild(img);
       wrap.appendChild(link);
+    } else if (f.mime === "text/html" || /\.html?$/i.test(f.name || "")) {
+      // A page the agent built (a game, say): the API signs it to open
+      // inline, so it runs in a new tab instead of downloading.
+      const link = document.createElement("a");
+      link.className = "msg-file-link";
+      link.href = f.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = `▶ Open ${f.name} in a new tab`;
+      wrap.appendChild(link);
     } else {
       const link = document.createElement("a");
       link.className = "msg-file-link";
