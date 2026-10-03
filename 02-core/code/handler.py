@@ -18,6 +18,7 @@ import json
 import logging
 
 from conversations import (
+    list_models,
     create_conversation,
     list_conversations,
     delete_conversation,
@@ -56,6 +57,9 @@ def lambda_handler(event, context):
 
         if method == "GET" and path == "/usage":
             return get_usage(event)
+
+        if method == "GET" and path == "/models":
+            return list_models(event)
 
         # --------------------------------------------------------------------
         # Conversation collection

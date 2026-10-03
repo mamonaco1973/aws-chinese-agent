@@ -75,6 +75,15 @@ resource "aws_apigatewayv2_route" "get_usage" {
   authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
 }
 
+# Keys and labels for the new-chat model picker.
+resource "aws_apigatewayv2_route" "list_models" {
+  api_id             = aws_apigatewayv2_api.api.id
+  route_key          = "GET /models"
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.cognito.id
+}
+
 # ================================================================================
 # Routes — conversations
 # ================================================================================

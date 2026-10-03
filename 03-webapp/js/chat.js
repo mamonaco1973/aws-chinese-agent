@@ -30,7 +30,7 @@ export function renderHistory(queries) {
 
     if (q.status === "complete") {
       appendAssistantMessage(q.answer || "", q.trace || [], q.query_id, q.files || [],
-                             q.tokens_used);
+                             q.tokens_used, _elapsedMs(q));
     } else if (q.status === "failed") {
       appendErrorMessage("This query failed. Please try again.", q.query_id);
     } else {
@@ -55,7 +55,12 @@ export function appendUserBubble(text) {
 /* ---------------------------------------------------------------------------- */
 
 export function appendPendingBubble(convId, queryId, onComplete) {
-  appendThinkingMessage(queryId);
+  // Opening a conversation with a query still running: renderHistory has
+  // already drawn its thinking bubble. Drawing another here gave two bubbles
+  // and two Cancel buttons, only one of them live.
+  if (!document.querySelector(`[data-query-id="${queryId}"]`)) {
+    appendThinkingMessage(queryId);
+  }
   scrollToBottom();
   _cancelHandlers[queryId] = onComplete;
   _startPolling(convId, queryId, onComplete);
@@ -108,6 +113,11 @@ function appendThinkingMessage(queryId) {
   const status = document.createElement("div");
   status.className = "thinking-status";
 
+  // The steps so far, rendered with the same markup as the finished trace,
+  // so you can follow the agent while it works instead of only afterwards.
+  const live = document.createElement("div");
+  live.className = "sources-list trace-list trace-live visible";
+
   const cancelBtn = document.createElement("button");
   cancelBtn.className = "cancel-query-btn";
   cancelBtn.textContent = "Cancel";
@@ -115,12 +125,13 @@ function appendThinkingMessage(queryId) {
 
   bubble.appendChild(dots);
   bubble.appendChild(status);
+  bubble.appendChild(live);
   bubble.appendChild(cancelBtn);
   row.appendChild(bubble);
   log.appendChild(row);
 }
 
-function appendAssistantMessage(text, trace, queryId, files, tokensUsed) {
+function appendAssistantMessage(text, trace, queryId, files, tokensUsed, elapsedMs) {
   const log   = document.getElementById("chat-log");
   const existing = queryId
     ? log.querySelector(`[data-query-id="${queryId}"]`)
@@ -132,6 +143,15 @@ function appendAssistantMessage(text, trace, queryId, files, tokensUsed) {
 
   const bubble = document.createElement("div");
   bubble.className = "msg-bubble";
+
+  // Trace first, collapsed: while the agent worked its steps were shown at the
+  // top of this bubble, so they stay at the top -- folded to one line -- and
+  // the answer appears below them instead of the steps jumping to the end.
+  if (trace && trace.length > 0) {
+    const traceSection = _buildTrace(trace, tokensUsed, elapsedMs);
+    traceSection.classList.add("sources-section--top");
+    bubble.appendChild(traceSection);
+  }
 
   const body = document.createElement("div");
   body.className = "msg-markdown";
@@ -149,11 +169,6 @@ function appendAssistantMessage(text, trace, queryId, files, tokensUsed) {
   // Files the model showed from its sandbox: the fractal itself, inline.
   if (files && files.length > 0) {
     bubble.appendChild(_buildFiles(files));
-  }
-
-  // Agent trace section (sandbox events, code, results) — expand to watch it work
-  if (trace && trace.length > 0) {
-    bubble.appendChild(_buildTrace(trace, tokensUsed));
   }
 
   row.innerHTML = "";
@@ -358,7 +373,19 @@ function _buildFiles(files) {
   return wrap;
 }
 
-function _buildTrace(trace, tokensUsed) {
+// Wall time the user waited: sent (created_at) to answer stored (updated_at,
+// set by the worker's finalize). Includes queueing and sandbox start-up.
+function _elapsedMs(q) {
+  const ms = Date.parse(q.updated_at) - Date.parse(q.created_at);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
+}
+
+function _fmtElapsed(ms) {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+}
+
+function _buildTrace(trace, tokensUsed, elapsedMs) {
   const section = document.createElement("div");
   section.className = "sources-section";
 
@@ -366,9 +393,10 @@ function _buildTrace(trace, tokensUsed) {
   // Tokens the whole query burned: every model turn in the loop, images
   // included. It is the exact amount deducted from the user's budget.
   const tokens = tokensUsed ? ` · ${_fmtTokens(tokensUsed)} tokens` : "";
+  const took   = elapsedMs ? ` · ${_fmtElapsed(elapsedMs)}` : "";
   const summary = toolCalls
-    ? `sandbox trace · ${toolCalls} tool call${toolCalls !== 1 ? "s" : ""}${tokens}`
-    : `sandbox trace${tokens}`;
+    ? `Reasoning · ${toolCalls} tool call${toolCalls !== 1 ? "s" : ""}${tokens}${took}`
+    : `Reasoning${tokens}${took}`;
 
   const toggle = document.createElement("button");
   toggle.className = "sources-toggle";
@@ -399,6 +427,7 @@ function _buildTrace(trace, tokensUsed) {
 /* ---------------------------------------------------------------------------- */
 
 function _startPolling(convId, queryId, onComplete) {
+  _stopPolling(queryId);
   let attempts = 0;
 
   const intervalId = setInterval(async () => {
@@ -421,7 +450,7 @@ function _startPolling(convId, queryId, onComplete) {
         _stopPolling(queryId);
         delete _cancelHandlers[queryId];
         appendAssistantMessage(q.answer || "", q.trace || [], queryId, q.files || [],
-                               q.tokens_used);
+                               q.tokens_used, _elapsedMs(q));
         scrollToBottom();
         if (onComplete) onComplete(q);
       } else if (q.status === "failed") {
@@ -444,8 +473,34 @@ function _startPolling(convId, queryId, onComplete) {
 
 function _updateProgress(queryId, trace) {
   const row = document.querySelector(`[data-query-id="${queryId}"]`);
-  const status = row && row.querySelector(".thinking-status");
+  if (!row) return;
+  const status = row.querySelector(".thinking-status");
   if (status) status.textContent = _progressText(trace);
+
+  const live = row.querySelector(".trace-live");
+  if (!live) return;
+
+  // Only scroll along if the reader was already at the bottom; someone
+  // reading an earlier step should not be yanked down every 2 seconds.
+  const log = document.getElementById("chat-log");
+  const pinned = log && log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+
+  // Update step by step instead of replacing the list: a fold the reader
+  // opened stays open, and the page does not jump. A step is re-rendered
+  // only if its markup changed.
+  const html = trace.map(_traceStepHtml);
+  while (live.children.length > html.length) live.lastElementChild.remove();
+  html.forEach((h, i) => {
+    let el = live.children[i];
+    if (el && el._stepHtml === h) return;
+    const tmp = document.createElement("div");
+    tmp.innerHTML = h;
+    const fresh = tmp.firstElementChild || document.createElement("div");
+    fresh._stepHtml = h;
+    if (el) el.replaceWith(fresh); else live.appendChild(fresh);
+  });
+
+  if (pinned) scrollToBottom();
 }
 
 function _stopPolling(queryId) {

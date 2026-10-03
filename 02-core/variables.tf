@@ -29,13 +29,47 @@ variable "region" {
 }
 
 # ================================================================================
-# Model — the Bedrock inference profile the worker's Converse loop calls. It
-# must support tool use and image input. Set in bedrock-config.sh.
+# Models -- the Bedrock models a user can pick when starting a conversation.
+# Set in bedrock-config.sh (BEDROCK_MODELS / BEDROCK_DEFAULT); apply.sh passes
+# them here as JSON. Each must support tool use.
 # ================================================================================
 
-variable "bedrock_model_id" {
-  description = "Bedrock model or inference-profile id for the Converse loop"
+variable "models" {
+  description = "Models offered in the picker (from bedrock-config.sh)"
+
+  type = list(object({
+    # Stored on the conversation; the picker's value.
+    key = string
+
+    # us.* / global.* inference profile, or a bare foundation-model id.
+    model_id = string
+
+    label = string
+
+    # Whether Converse accepts image blocks / cachePoint blocks for it.
+    image_input    = bool
+    prompt_caching = bool
+  }))
+
+  validation {
+    condition     = length(var.models) > 0
+    error_message = "At least one model must be defined in bedrock-config.sh."
+  }
+
+  validation {
+    condition     = length(distinct([for m in var.models : m.key])) == length(var.models)
+    error_message = "Model keys must be unique."
+  }
+}
+
+variable "default_model" {
+  description = "Key of the model new conversations start on"
   type        = string
+
+  validation {
+    condition     = contains([for m in var.models : m.key], var.default_model)
+    error_message = "default_model must be one of the keys in models."
+  }
 }
 
 # ================================================================================

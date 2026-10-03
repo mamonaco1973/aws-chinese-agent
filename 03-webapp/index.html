@@ -327,6 +327,11 @@
             rows="1"
             maxlength="4000"
           ></textarea>
+          <!-- Model selector, inline before send (same placement as
+               mycorpus-runtime). Filled by app.js from GET /models; disabled
+               once the chat's first message locks its model. -->
+          <select id="model-picker" class="model-selector-select hidden"
+                  title="Model for this conversation"></select>
           <button id="btn-send" title="Send">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
                  viewBox="0 0 24 24" fill="none" stroke="currentColor"

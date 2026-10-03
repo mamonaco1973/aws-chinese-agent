@@ -91,7 +91,8 @@ if [[ -f 02-core/terraform.tfstate ]]; then
   echo "NOTE: Destroying 02-core..."
   terraform -chdir=02-core init -input=false
   terraform -chdir=02-core destroy -auto-approve -input=false \
-    -var="bedrock_model_id=${BEDROCK_MODEL_ID}" \
+    -var="models=$(bedrock_models_json)" \
+    -var="default_model=${BEDROCK_DEFAULT}" \
     -var="sandbox_image_arn=${IMAGE_ARN:-arn:aws:lambda:${AWS_DEFAULT_REGION}:000000000000:microvm-image:unused}" \
     -var="sandbox_image_version=${IMAGE_VERSION}" \
     -var="google_client_id=${AWS_AGENTOPS_GOOGLE_CLIENT_ID:-}" \

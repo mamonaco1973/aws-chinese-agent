@@ -69,6 +69,22 @@ export function updateConvTitle(convId, title) {
 }
 
 /* ---------------------------------------------------------------------------- */
+/* Public: a conversation's record, and setting its model once locked          */
+/* ---------------------------------------------------------------------------- */
+
+export function getConversation(convId) {
+  return _conversations.find(c => c.conv_id === convId) || null;
+}
+
+export function setConversationModel(convId, model, label) {
+  const conv = getConversation(convId);
+  if (conv) {
+    conv.model = model;
+    conv.model_label = label;
+  }
+}
+
+/* ---------------------------------------------------------------------------- */
 /* Rendering                                                                     */
 /* ---------------------------------------------------------------------------- */
 

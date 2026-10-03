@@ -136,10 +136,13 @@ resource "aws_iam_policy" "lambda_bedrock" {
       Sid    = "InvokeModel"
       Effect = "Allow"
       Action = ["bedrock:InvokeModel"]
-      Resource = [
-        "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/${var.bedrock_model_id}",
-        "arn:aws:bedrock:*::foundation-model/*",
-      ]
+      # One inference-profile ARN per model in bedrock-config.sh (harmless
+      # for a bare foundation-model id, which the wildcard below covers).
+      Resource = concat(
+        [for m in var.models :
+          "arn:aws:bedrock:*:${data.aws_caller_identity.current.account_id}:inference-profile/${m.model_id}"],
+        ["arn:aws:bedrock:*::foundation-model/*"],
+      )
     }]
   })
 }

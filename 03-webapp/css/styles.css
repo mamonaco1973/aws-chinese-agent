@@ -710,6 +710,8 @@ ul { list-style: none; }
   font-size: 0.9rem;
   color: var(--text-muted);
 }
+/* Trace above the answer: space below it instead of above. */
+.sources-section--top { margin-top: 0; margin-bottom: 10px; }
 
 .sources-toggle {
   display: flex;
@@ -845,6 +847,10 @@ ul { list-style: none; }
   min-height: 1em;
 }
 
+/* Live steps under the status line while the agent works. */
+.trace-live { padding-left: 0; margin-top: 8px; }
+.trace-live:empty { display: none; }
+
 /* ---- Files the model showed from its sandbox ---- */
 .msg-files {
   display: flex;
@@ -877,6 +883,34 @@ ul { list-style: none; }
   gap: 6px;
 }
 
+/* Model selector: a pill inline before send, as in mycorpus-runtime. */
+.model-selector-select {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  align-self: center;
+  background: var(--bg-hover)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")
+    no-repeat right 8px center;
+  border: none;
+  outline: none;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  padding: 5px 24px 5px 10px;
+  border-radius: 16px;
+  cursor: pointer;
+}
+.model-selector-select:hover { background-color: var(--border); color: var(--text-primary); }
+.model-selector-select:focus { outline: none; }
+/* Locked to the conversation: still shows which model, no chevron, no hover. */
+.model-selector-select:disabled {
+  background-image: none;
+  padding-right: 10px;
+  cursor: default;
+}
+.model-selector-select:disabled:hover { background-color: var(--bg-hover); color: var(--text-muted); }
+
 #input-wrapper {
   display: flex;
   align-items: center;
@@ -904,6 +938,11 @@ ul { list-style: none; }
   color: var(--text-primary);
 }
 #chat-input::placeholder { color: var(--text-muted); }
+
+/* New conversation (empty state showing): open with room for five lines of
+   prompt -- the long placeholder and a multi-line request both read better.
+   Back to one line once the chat has messages; _autoResize still grows it. */
+#chat-main:has(#empty-state:not(.hidden)) #chat-input { min-height: 7.5em; }
 
 #btn-send {
   flex-shrink: 0;

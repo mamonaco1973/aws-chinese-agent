@@ -53,33 +53,36 @@ if ! aws lambda-microvms help > /dev/null 2>&1; then
 fi
 echo "NOTE: AWS CLI supports the lambda-microvms service."
 
-# Bedrock model ID is set by apply.sh (single source of truth). The fallback
-# here only applies if check_env.sh is run standalone.
-BEDROCK_MODEL_ID="${BEDROCK_MODEL_ID:-us.anthropic.claude-sonnet-4-6}"
+# Every model in bedrock-config.sh, probed with real Converse calls. Not a
+# lookup: a model can be ACTIVE and still be denied to this account, or reject
+# the image/cachePoint blocks its switches would make the worker send. Each
+# entry's switches are passed along, so a "true" the model cannot honour fails
+# here instead of failing every request after deploy.
+if [[ -z "${BEDROCK_MODELS+x}" ]]; then
+  source "$(dirname "$0")/bedrock-config.sh"
+fi
 
-echo "NOTE: Checking Bedrock inference profile ${BEDROCK_MODEL_ID} in ${REGION}."
-
-if ! aws bedrock list-inference-profiles --region "${REGION}" \
-       --query "inferenceProfileSummaries[?inferenceProfileId=='${BEDROCK_MODEL_ID}'].inferenceProfileId" \
-       --output text 2>/dev/null | grep -q "${BEDROCK_MODEL_ID}"; then
-  echo "ERROR: Inference profile ${BEDROCK_MODEL_ID} not available in ${REGION}."
-  echo "       Enable access: https://console.aws.amazon.com/bedrock/home?region=${REGION}#/modelaccess"
+if ! printf '%s\n' "${BEDROCK_MODELS[@]}" | cut -d'|' -f1 | grep -qx "${BEDROCK_DEFAULT}"; then
+  echo "ERROR: BEDROCK_DEFAULT '${BEDROCK_DEFAULT}' is not a key in BEDROCK_MODELS."
   exit 1
 fi
 
-# Converse, not invoke-model: it is the API the worker calls, so a pass here
-# means the worker's call shape works for this model.
-echo "NOTE: Testing Bedrock Converse with ${BEDROCK_MODEL_ID}..."
-if ! ERR=$(aws bedrock-runtime converse \
-  --region "${REGION}" \
-  --model-id "${BEDROCK_MODEL_ID}" \
-  --messages '[{"role":"user","content":[{"text":"hi"}]}]' \
-  --inference-config '{"maxTokens":1}' 2>&1 > /dev/null); then
-  if echo "$ERR" | grep -q "AccessDeniedException"; then
-    echo "ERROR: Bedrock invocation failed — model access not enabled."
-    echo "       Enable access: https://console.aws.amazon.com/bedrock/home?region=${REGION}#/modelaccess"
-    exit 1
+echo "NOTE: Checking ${#BEDROCK_MODELS[@]} Bedrock model(s) in ${REGION}, default ${BEDROCK_DEFAULT}."
+MODEL_FAILED=0
+for entry in "${BEDROCK_MODELS[@]}"; do
+  IFS='|' read -r key model_id label image caching <<< "${entry}"
+  if result=$(python3 "$(dirname "$0")/probe_bedrock.py" --region "${REGION}" \
+       --check "${model_id}" --image "${image}" --caching "${caching}" 2>&1); then
+    echo "NOTE: [${key}] ${result}"
+  else
+    echo "ERROR: [${key}] ${result}"
+    MODEL_FAILED=1
   fi
-  echo "WARNING: Converse probe failed (not an access error): ${ERR}"
+done
+if [[ "${MODEL_FAILED}" -ne 0 ]]; then
+  echo "ERROR: Fix BEDROCK_MODELS in bedrock-config.sh. ./probe_bedrock.py lists"
+  echo "       every model this account can use, with measured switches."
+  echo "       Model access: https://console.aws.amazon.com/bedrock/home?region=${REGION}#/modelaccess"
+  exit 1
 fi
-echo "NOTE: Bedrock invocation access confirmed."
+echo "NOTE: All Bedrock models confirmed."

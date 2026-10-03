@@ -38,9 +38,10 @@ this repo.
 
 ### Why a Converse loop, not Bedrock Agents
 
-- **The model must see its own image.** `show_file` returns the PNG as an
-  image block, so the model can catch a bad render. Bedrock Agents action
-  groups return text only.
+- **The model can see its own image** (when it supports image input).
+  `show_file` returns the PNG as an image block, so the model can catch a bad
+  render. Bedrock Agents action groups return text only. DeepSeek V3.2 is
+  text-only, so this is switched off for it (see Model).
 - **The worker waits, not the model.** `run_code`/`run_shell` block in the worker (up to
   4 minutes, then it hands back a job id for `get_result`). The model never
   has to poll from inside its own reasoning.
@@ -139,13 +140,45 @@ this repo.
 - MicroVMs are not owned by Terraform. `destroy.sh` terminates every VM
   launched from the image before destroying anything.
 
-## Model
+## Models
 
-`bedrock-config.sh` sets `BEDROCK_MODEL_ID`; the default is
-`us.anthropic.claude-sonnet-4-6`. On the author's account, Sonnet 5 is listed
-ACTIVE in `list-inference-profiles` but Converse refuses it with
-AccessDenied. `check_env.sh` probes with a real Converse call for that
-reason. The model must support tool use and image input.
+`bedrock-config.sh` lists the models a user can pick (`BEDROCK_MODELS`, one
+`key|model id|label|image input|prompt caching` per line) and the default
+(`BEDROCK_DEFAULT`). `apply.sh` passes them to Terraform as JSON; both Lambdas
+get them as `MODELS_JSON` / `DEFAULT_MODEL` and read them through
+`code/models.py`.
+
+- **Locked per conversation, by its first message.** The new-chat screen shows
+  a picker; `POST .../queries` carries `model`, and `submit_query` stores it on
+  the CONV# item with a conditional write (`attribute_not_exists(model)`), so
+  later messages cannot change it. History and the sandbox carry across
+  messages; one model per chat keeps them coherent. The picker then becomes
+  the locked model's name. `GET /models` feeds the picker.
+- **The worker reads the model per query** from the CONV# item
+  (`_conversation_model`); an unknown or retired key falls back to the
+  default. Every trace starts with a "Model: ..." context step.
+- **The two switches are per model.** `image_input: false` -- `show_file`
+  still stages the file for the user (S3 + signed URL) but tells the model in
+  text, and the system prompt drops the "review your image" rules
+  (`SYSTEM_PROMPTS[False]`). `prompt_caching: false` -- no cachePoints are
+  sent. A switch that is `true` for a model that cannot honour it makes every
+  request to that model fail.
+- **Token use counts the same for every model.** The budget caps the bill; it
+  does not price models.
+- **IAM** allows every inference profile in the list plus any foundation
+  model (on-demand ids such as `deepseek.v3.2` have no profile).
+
+`./probe_bedrock.py` lists every model this account can use -- `us.*`,
+`global.*` and on-demand ids in one table -- tests tool use, image input and
+prompt caching with real calls, and prints ready-to-paste `BEDROCK_MODELS`
+lines. `check_env.sh` runs `probe_bedrock.py --check <id> --image --caching`
+on every entry, which fails a switch the model cannot honour.
+
+Probed 2026-10-02: Sonnet 4.6 supports all three. DeepSeek V3.2 calls tools
+but rejects image blocks (ValidationException) and any cachePoint
+(AccessDeniedException). Without vision it tends to make "another version"
+of what it rendered; `show_file`'s text reply tells it the request is done,
+and its leaked `<｜DSML｜function_calls` markup is stripped from text blocks.
 
 ## Testing Without Deploying
 

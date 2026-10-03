@@ -39,6 +39,7 @@ import boto3
 from botocore.config import Config
 
 import memory
+import models
 import sandbox
 
 # ================================================================================
@@ -63,12 +64,33 @@ bedrock = boto3.client(
                   retries={"mode": "standard", "max_attempts": 4}),
 )
 
+# DeepSeek on Bedrock sometimes ends the text before a tool call with a line of
+# its native tool-call syntax ("<｜DSML｜function_calls"), even though the call
+# itself arrives as a proper toolUse block. Left in, it shows in the trace and
+# is replayed to the model in later messages, which teaches it the pattern.
+_MARKUP = re.compile(r"<｜DSML｜[^\n]*")
+
+
+def _strip_markup(message):
+    """Remove leaked tool-call markup from a model message, in place."""
+    content = message.get("content") or []
+    for block in content:
+        if "text" in block:
+            block["text"] = _MARKUP.sub("", block["text"]).strip()
+    # Converse rejects empty text blocks on replay; drop them, but never leave
+    # the message with no content at all.
+    kept = [b for b in content if "text" not in b or b["text"]]
+    message["content"] = kept or [{"text": "(no text)"}]
+
+
 # ================================================================================
 # Environment and limits
 # ================================================================================
 
 BACKEND_BUCKET = os.environ["BACKEND_BUCKET_NAME"]
-MODEL_ID       = os.environ["BEDROCK_MODEL_ID"]
+
+# The model, and whether it takes images and cache points, is per
+# conversation: see models.py and bedrock-config.sh.
 
 # Model round-trips per query. A fractal takes three or four; the cap stops a
 # model that keeps "fixing" the same error from burning the token budget.
@@ -89,6 +111,52 @@ IMAGE_BYTES_LIMIT = 3_750_000
 IMAGE_PX_LIMIT    = 8000
 IMAGE_FORMATS = {"image/png": "png", "image/jpeg": "jpeg",
                  "image/gif": "gif", "image/webp": "webp"}
+
+# "Showing results" depends on whether the model can see images. With image
+# input, show_file hands the PNG back and the model reviews and re-renders;
+# without it the user still gets the file (S3 + signed URL), and the model is
+# told to get the figure right in code instead of asking it to "review" an
+# image it never receives.
+SHOWING_VISION = """Showing results:
+- Save figures to files with plt.savefig(...) and plt.close(); never \
+plt.show(). Then call show_file with the path. The image is attached to your \
+answer for the user, and returned to you so you can check it.
+- Review every image you show before answering. Does it look like what was \
+asked for? Is anything floating, clipped, cropped, overlapping, or in large \
+empty space? Is all text rendered (no missing-glyph boxes)? If anything is \
+off, fix the code, save to the SAME path, and call show_file again -- that \
+replaces the earlier attachment, so the user only sees the final version.
+- Fix real defects, not taste: one correction pass is usually enough. \
+Anything cut off at the frame edge or hidden behind the title or labels IS a \
+defect -- fix it. Do not re-render repeatedly for small spacing tweaks; each \
+render costs the user time.
+- Treat warnings in cell output as bugs to fix. The fonts have no emoji: \
+keep emoji out of plot titles and labels.
+- Prefer a clean, faithful rendering of what was asked over decoration.
+- Never paste file contents, base64, links, or markdown image syntax into \
+your answer -- the user already sees every file you showed.
+
+"""
+
+SHOWING_TEXT = """Showing results:
+- Save figures to files with plt.savefig(...) and plt.close(); never \
+plt.show(). Then call show_file with the path. The image is attached to your \
+answer for the user. You cannot see images, so get the figure right in \
+code: size the figure and set limits so nothing is clipped, and call \
+show_file once.
+- Build exactly what was asked: one figure unless the user asks for more. \
+No style variations, animation frames, summary figures or extra files.
+- Fix real defects, not taste. Anything cut off at the frame edge or hidden \
+behind the title or labels IS a defect -- fix it, save to the SAME path, and \
+call show_file again; that replaces the earlier attachment. Do not re-render \
+for small spacing tweaks; each render costs the user time.
+- Treat warnings in cell output as bugs to fix. The fonts have no emoji: \
+keep emoji out of plot titles and labels.
+- Prefer a clean, faithful rendering of what was asked over decoration.
+- Never paste file contents, base64, links, or markdown image syntax into \
+your answer -- the user already sees every file you showed.
+
+"""
 
 SYSTEM_PROMPT = """You are a coding agent with a private Python sandbox: a Lambda \
 MicroVM (Firecracker VM, its own kernel) that belongs to this conversation.
@@ -117,27 +185,15 @@ the user to start it.
 - A failing command returns its error and the sessions survive. Read the \
 error, fix it, run it again.
 
-Showing results:
-- Save figures to files with plt.savefig(...) and plt.close(); never \
-plt.show(). Then call show_file with the path. The image is attached to your \
-answer for the user, and returned to you so you can check it.
-- Review every image you show before answering. Does it look like what was \
-asked for? Is anything floating, clipped, cropped, overlapping, or in large \
-empty space? Is all text rendered (no missing-glyph boxes)? If anything is \
-off, fix the code, save to the SAME path, and call show_file again -- that \
-replaces the earlier attachment, so the user only sees the final version.
-- Fix real defects, not taste: one correction pass is usually enough. \
-Anything cut off at the frame edge or hidden behind the title or labels IS a \
-defect -- fix it. Do not re-render repeatedly for small spacing tweaks; each \
-render costs the user time.
-- Treat warnings in cell output as bugs to fix. The fonts have no emoji: \
-keep emoji out of plot titles and labels.
-- Prefer a clean, faithful rendering of what was asked over decoration.
-- Never paste file contents, base64, links, or markdown image syntax into \
-your answer -- the user already sees every file you showed.
-
-Your final answer: say briefly what you built and the key parameters, then \
+@@SHOWING@@Your final answer: say briefly what you built and the key parameters, then \
 include the final code in a ```python block unless it is very long."""
+
+# Keyed by the model's image_input: with it the model reviews its own renders,
+# without it the same prompt minus the "look at your image" rules.
+SYSTEM_PROMPTS = {
+    True:  SYSTEM_PROMPT.replace("@@SHOWING@@", SHOWING_VISION),
+    False: SYSTEM_PROMPT.replace("@@SHOWING@@", SHOWING_TEXT),
+}
 
 TOOLS = [
     {"toolSpec": {
@@ -364,9 +420,10 @@ def _png_too_large(body):
 class Run:
     """State for one query: the sandbox, the trace, artifacts and deadlines."""
 
-    def __init__(self, user_id, conv_id, query_id, context):
+    def __init__(self, user_id, conv_id, query_id, context, model):
         self.user_id = user_id
         self.conv_id = conv_id
+        self.model = model              # models.get(): id, label, capabilities
         self.prefix = _s3_prefix(user_id, conv_id, query_id)
         self.trace_key = f"{self.prefix}/trace.json"
         self.context = context
@@ -507,6 +564,19 @@ class Run:
         self.step(type="file", name=name, mime=mime, size=len(body), replaced=replaced)
 
         fmt = IMAGE_FORMATS.get(mime)
+        if fmt and not self.model["image_input"]:
+            # Text-only model: the user already has the file; an image block
+            # would be rejected by Converse (ValidationException).
+            # The system prompt's scope rule was not enough: told only "you
+            # cannot see it", DeepSeek kept making "another version" and a
+            # "final version" under new names, each one a new attachment.
+            # This reply is what it reads right before choosing its next
+            # step, so it closes the question there.
+            return [{"text": f"{note}Shown to the user: {name} ({len(body):,} bytes). "
+                             "That completes the request -- do not make another "
+                             "version or a variant; write your final answer now. "
+                             "Re-render only if the code printed an error or a "
+                             "warning, and then save to the SAME path."}], True
         if fmt and len(body) <= IMAGE_BYTES_LIMIT and not _png_too_large(body):
             return [{"text": f"{note}Shown to the user: {name} ({len(body):,} bytes). "
                              "Here it is so you can check it."},
@@ -538,10 +608,19 @@ class Run:
             # The system checkpoint covers the tools and system prompt, which
             # never change; memory.cache_points adds the history and latest-
             # message checkpoints.
+            # Models without prompt caching reject any request that carries a
+            # cachePoint, so the checkpoints are left out entirely for them.
+            prompt = SYSTEM_PROMPTS[self.model["image_input"]]
+            if self.model["prompt_caching"]:
+                system = [{"text": prompt}, memory.CACHE_POINT]
+                sent = memory.cache_points(messages, history_len)
+            else:
+                system = [{"text": prompt}]
+                sent = messages
             response = bedrock.converse(
-                modelId=MODEL_ID,
-                system=[{"text": SYSTEM_PROMPT}, memory.CACHE_POINT],
-                messages=memory.cache_points(messages, history_len),
+                modelId=self.model["model_id"],
+                system=system,
+                messages=sent,
                 toolConfig={"tools": TOOLS},
                 inferenceConfig={"maxTokens": 8192},
             )
@@ -552,6 +631,7 @@ class Run:
             self.usage["cache_write"] += int(usage.get("cacheWriteInputTokens") or 0)
 
             message = response["output"]["message"]
+            _strip_markup(message)
             messages.append(message)
             blocks = message.get("content") or []
             text = "\n".join(b["text"] for b in blocks if "text" in b).strip()
@@ -594,9 +674,15 @@ class Run:
 # Core: one query
 # ================================================================================
 
+def _conversation_model(user_id, conv_id):
+    """The model locked to this conversation by its first message."""
+    item = table.get_item(Key={"pk": f"USER#{user_id}", "sk": f"CONV#{conv_id}"}).get("Item") or {}
+    return models.get(item.get("model"))
+
+
 def process_query(user_id, conv_id, query_id, context):
     """Run the tool loop for one query and persist answer, trace and files."""
-    run = Run(user_id, conv_id, query_id, context)
+    run = Run(user_id, conv_id, query_id, context, _conversation_model(user_id, conv_id))
     _update_query_status(user_id, conv_id, query_id, "processing", run.trace_key)
 
     try:
@@ -611,6 +697,7 @@ def process_query(user_id, conv_id, query_id, context):
         return
 
     t0 = time.time()
+    run.step(type="context", text=f"Model: {run.model['label']}")
 
     # Context: earlier exchanges (with their tool calls) and what the sandbox
     # holds. The state block goes in the question message, not the system

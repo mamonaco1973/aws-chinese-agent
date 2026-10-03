@@ -67,6 +67,7 @@ async function apiFetch(method, path, body, _retry = false) {
 
 export function registerUser()      { return apiFetch("POST", "/register"); }
 export function getUsage()          { return apiFetch("GET",  "/usage"); }
+export function getModels()         { return apiFetch("GET",  "/models"); }
 
 /* ---------------------------------------------------------------------------- */
 /* Conversations                                                                 */
@@ -84,8 +85,11 @@ export function listQueries(convId) {
   return apiFetch("GET", `/conversations/${convId}/queries`);
 }
 
-export function submitQuery(convId, question) {
-  return apiFetch("POST", `/conversations/${convId}/queries`, { question });
+// `model` only matters on a conversation's first message, which locks it;
+// the API ignores it afterwards.
+export function submitQuery(convId, question, model) {
+  const body = model ? { question, model } : { question };
+  return apiFetch("POST", `/conversations/${convId}/queries`, body);
 }
 
 export function getQuery(convId, queryId) {

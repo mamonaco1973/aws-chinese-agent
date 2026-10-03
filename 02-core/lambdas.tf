@@ -23,6 +23,11 @@ locals {
     SANDBOX_IMAGE_ARN     = var.sandbox_image_arn
     SANDBOX_IMAGE_VERSION = var.sandbox_image_version
     SANDBOX_ROLE_ARN      = aws_iam_role.sandbox.arn
+
+    # The API validates the picker's choice and serves GET /models; the
+    # worker resolves each conversation's model. Same list for both.
+    MODELS_JSON   = jsonencode(var.models)
+    DEFAULT_MODEL = var.default_model
   }
 }
 
@@ -83,9 +88,7 @@ resource "aws_lambda_function" "worker" {
   memory_size = 512
 
   environment {
-    variables = merge(local.lambda_env, {
-      BEDROCK_MODEL_ID = var.bedrock_model_id
-    })
+    variables = local.lambda_env
   }
 }
 

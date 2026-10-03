@@ -6,12 +6,13 @@
 
 import { isLoggedIn, getLoginUrl, clearTokens, getUserInfo } from "./auth.js";
 import {
-  registerUser, getUsage,
+  registerUser, getUsage, getModels,
   createConversation, listQueries, submitQuery,
 } from "./api.js";
 import {
   initSidebar, refreshSidebar,
   setActiveConversation, prependConversation, updateConvTitle,
+  getConversation, setConversationModel,
 } from "./sidebar.js";
 import {
   renderHistory, appendUserBubble,
@@ -22,6 +23,13 @@ import { initTheme, setTheme, getTheme } from "./theme.js";
 
 // localStorage key for the desktop sidebar's collapsed state.
 const _SIDEBAR_KEY = "sa-sidebar";
+
+// localStorage key for the model the picker last had, so new chats start on
+// the user's usual choice rather than the server default every time.
+const _MODEL_KEY = "sa-model";
+
+// GET /models: { default, models: [{ key, label }] }. Empty until loaded.
+let _models = { default: "", models: [] };
 
 /* ---------------------------------------------------------------------------- */
 /* Application state                                                             */
@@ -92,10 +100,72 @@ async function boot() {
 
   // Load sidebar + token ring behind the spinner, then reveal the empty state
   // (unless a conversation got selected while loading).
-  await Promise.all([refreshSidebar(), _refreshUsage()]);
+  await Promise.all([refreshSidebar(), _refreshUsage(), _loadModels()]);
   document.getElementById("boot-spinner").classList.add("hidden");
   if (!_activeConvId) {
     document.getElementById("empty-state").classList.remove("hidden");
+  }
+  _updateModelRow();
+}
+
+/* ---------------------------------------------------------------------------- */
+/* Model picker                                                                  */
+/* A conversation's model is locked by its first message. Until then the input */
+/* bar shows a picker; afterwards, the locked model's name.                    */
+/* ---------------------------------------------------------------------------- */
+
+async function _loadModels() {
+  try {
+    _models = await getModels();
+  } catch (err) {
+    // Without the list the server default applies; hide the row.
+    console.error("Failed to load models", err);
+    return;
+  }
+  const picker = document.getElementById("model-picker");
+  picker.innerHTML = "";
+  for (const m of _models.models) {
+    const opt = document.createElement("option");
+    opt.value = m.key;
+    opt.textContent = m.label;
+    picker.appendChild(opt);
+  }
+  const saved = _storageGet(_MODEL_KEY);
+  picker.value = _models.models.some(m => m.key === saved) ? saved : _models.default;
+  picker.addEventListener("change", () => _storageSet(_MODEL_KEY, picker.value));
+}
+
+function _activeModelLocked() {
+  const conv = _activeConvId ? getConversation(_activeConvId) : null;
+  return conv && conv.model ? conv : null;
+}
+
+// The picker stays in place either way: free while the chat is empty,
+// disabled and showing the conversation's model once it is locked.
+function _updateModelRow() {
+  const picker = document.getElementById("model-picker");
+  if (!_models.models.length) {
+    picker.classList.add("hidden");
+    return;
+  }
+  picker.classList.remove("hidden");
+  const conv = _activeModelLocked();
+  if (conv) {
+    // A retired key is no longer an option; add it so the pill still names it.
+    if (![...picker.options].some(o => o.value === conv.model)) {
+      const opt = document.createElement("option");
+      opt.value = conv.model;
+      opt.textContent = conv.model_label || conv.model;
+      picker.appendChild(opt);
+    }
+    picker.value = conv.model;
+    picker.disabled = true;
+    picker.title = "Each conversation keeps the model it started with";
+  } else {
+    const saved = _storageGet(_MODEL_KEY);
+    picker.value = _models.models.some(m => m.key === saved) ? saved : _models.default;
+    picker.disabled = false;
+    picker.title = "Model for this conversation";
   }
 }
 
@@ -280,6 +350,7 @@ async function _startNewChat() {
 
     prependConversation(conv);
     setActiveConversation(_activeConvId);
+    _updateModelRow();
 
     // Show empty state, hide log
     document.getElementById("empty-state").classList.remove("hidden");
@@ -305,6 +376,7 @@ async function _selectConversation(convId) {
   _closeMobileSidebar();
   _activeConvId = convId;
   setActiveConversation(convId);
+  _updateModelRow();
 
   // Show log, hide empty state (and the boot spinner, if this click beat it)
   document.getElementById("boot-spinner").classList.add("hidden");
@@ -372,7 +444,18 @@ async function _handleSend() {
   appendUserBubble(question);
 
   try {
-    const result = await submitQuery(_activeConvId, question);
+    const model  = _activeModelLocked() ? null : document.getElementById("model-picker").value;
+    const result = await submitQuery(_activeConvId, question, model);
+    if (result.model) {
+      setConversationModel(_activeConvId, result.model, result.model_label);
+      _updateModelRow();
+    }
+
+    // The API titles the conversation from the first message as it accepts
+    // it, so pick the title up now. Waiting for the answer missed it when the
+    // user switched chats first: switching drops the poll and its callback.
+    const sentConvId = _activeConvId;
+    refreshSidebar().then(() => setActiveConversation(_activeConvId || sentConvId));
 
     appendPendingBubble(_activeConvId, result.query_id, (completed) => {
       _setSending(false);
@@ -413,6 +496,7 @@ function _onConversationDeleted(convId) {
     document.getElementById("chat-log").classList.add("hidden");
     document.getElementById("empty-state").classList.remove("hidden");
   }
+  _updateModelRow();
 }
 
 /* ---------------------------------------------------------------------------- */

@@ -14,7 +14,7 @@
 
 export AWS_DEFAULT_REGION="us-east-1"
 
-# Exports BEDROCK_MODEL_ID. Sourced before strict mode so simple assignments
+# Defines BEDROCK_MODELS / BEDROCK_DEFAULT and bedrock_models_json. Sourced before strict mode so simple assignments
 # don't trip the unbound-variable check.
 source "$(dirname "$0")/bedrock-config.sh"
 
@@ -97,7 +97,8 @@ echo "NOTE: Sandbox image ${IMAGE_ARN##*:} version ${IMAGE_VERSION}"
 echo "NOTE: Deploying backend (API, worker, auth, storage)..."
 terraform -chdir=02-core init -input=false
 terraform -chdir=02-core apply -auto-approve -input=false \
-  -var="bedrock_model_id=${BEDROCK_MODEL_ID}" \
+  -var="models=$(bedrock_models_json)" \
+  -var="default_model=${BEDROCK_DEFAULT}" \
   -var="sandbox_image_arn=${IMAGE_ARN}" \
   -var="sandbox_image_version=${IMAGE_VERSION}" \
   -var="google_client_id=${AWS_AGENTOPS_GOOGLE_CLIENT_ID:-}" \

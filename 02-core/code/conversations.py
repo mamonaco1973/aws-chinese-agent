@@ -33,7 +33,9 @@ from decimal import Decimal
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
+import models
 import sandbox
 from users import token_limit
 
@@ -128,6 +130,11 @@ def _check_token_budget(user_id):
 # POST /conversations
 # --------------------------------------------------------------------------------
 
+def list_models(event):
+    """Keys and labels for the new-chat model picker, plus the default."""
+    return json_response(200, models.public())
+
+
 def create_conversation(event):
     """Create a new empty conversation. Title derives from the first query."""
     user_id = get_user_id(event)
@@ -173,6 +180,8 @@ def list_conversations(event):
             "title":      item.get("title", ""),
             "created_at": item.get("created_at"),
             "updated_at": item.get("updated_at"),
+            "model":      item.get("model"),
+            "model_label": models.get(item["model"])["label"] if item.get("model") else None,
         }
         for item in result.get("Items", [])
     ]
@@ -258,6 +267,29 @@ def submit_query(event):
     if over:
         return json_response(429, {"error": "token_limit_reached"})
 
+    # The first message locks the conversation's model: the picker's choice
+    # if valid, else the default. Later messages cannot change it -- history
+    # and the sandbox carry across messages, and one model per chat keeps
+    # them coherent. The condition makes the lock race-free.
+    requested = (body.get("model") or "").strip()
+    chosen = requested if models.is_valid(requested) else models.DEFAULT
+    try:
+        table.update_item(
+            Key={"pk": f"USER#{user_id}", "sk": f"CONV#{conv_id}"},
+            UpdateExpression="SET #m = :m",
+            ConditionExpression="attribute_exists(sk) AND attribute_not_exists(#m)",
+            ExpressionAttributeNames={"#m": "model"},
+            ExpressionAttributeValues={":m": chosen},
+        )
+        model_key = chosen
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            raise
+        item = table.get_item(Key={"pk": f"USER#{user_id}", "sk": f"CONV#{conv_id}"}).get("Item")
+        if not item:
+            return json_response(404, {"error": "conversation not found"})
+        model_key = item.get("model") or models.DEFAULT
+
     query_id = str(uuid.uuid4())
     now      = utc_now()
     prefix   = _s3_prefix(user_id, conv_id, query_id)
@@ -295,9 +327,11 @@ def submit_query(event):
     )
 
     return json_response(200, {
-        "query_id": query_id,
-        "conv_id":  conv_id,
-        "status":   "pending",
+        "query_id":    query_id,
+        "conv_id":     conv_id,
+        "status":      "pending",
+        "model":       model_key,
+        "model_label": models.get(model_key)["label"],
     })
 
 
