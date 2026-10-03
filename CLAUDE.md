@@ -190,8 +190,8 @@ and its leaked `<｜DSML｜function_calls` markup is stripped from text blocks.
   `sandbox.ensure`/`_token` patched to return
   `{"endpoint": "http://<container>:8080"}`. The client accepts an explicit
   scheme for exactly this reason.
-- `validate.sh` (run by `apply.sh`) smoke-tests a real VM: render, fetch,
-  suspend, resume.
+- `validate.sh` (run by `apply.sh`) smoke-tests a real VM: launch it, run
+  one Python cell, terminate it.
 
 ## Code Commenting Standards
 

@@ -93,9 +93,8 @@ us-west-2, eu-west-1 and ap-northeast-1.
 | 3 | `03-webapp` | Generated `config.js` and the static SPA, uploaded to S3 |
 
 It finishes with `validate.sh`. That script launches a sandbox directly,
-renders a fractal tree, fetches the PNG, then suspends the VM and resumes it
-with a plain HTTPS request, and checks the Python state survived. Last, it
-prints the app URL.
+checks that it comes up and runs a line of Python, terminates it, and prints
+the app URL.
 
 Optional environment variables: `AWS_AGENTOPS_GOOGLE_CLIENT_ID` / `_SECRET`
 (Google sign-in via Cognito) and `AWS_AGENTOPS_CUSTOM_DOMAIN`.

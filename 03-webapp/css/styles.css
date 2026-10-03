@@ -939,10 +939,9 @@ ul { list-style: none; }
 }
 #chat-input::placeholder { color: var(--text-muted); }
 
-/* New conversation (empty state showing): open with room for five lines of
-   prompt -- the long placeholder and a multi-line request both read better.
-   Back to one line once the chat has messages; _autoResize still grows it. */
-#chat-main:has(#empty-state:not(.hidden)) #chat-input { min-height: 7.5em; }
+/* Room for five lines of prompt at all times -- a multi-line request reads
+   better than one line that scrolls. _autoResize still grows it to max-height. */
+#chat-input { min-height: 7.5em; }
 
 #btn-send {
   flex-shrink: 0;
