@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for working in **aws-microvm-agent-sandbox** (product name: **MicroVM Agent Sandbox**).
+Guidance for working in **aws-chinese-agent** (product name: **MicroVM Agent Sandbox**).
 Read this before changing `01-sandbox/image/` or `02-core/code/worker.py`;
 several things here look like obvious improvements and are not.
 

@@ -1,4 +1,4 @@
-# MicroVM Agent Sandbox (`aws-microvm-agent-sandbox`)
+# MicroVM Agent Sandbox (`aws-chinese-agent`)
 
 A chat app whose agent has its own **AWS Lambda MicroVM** to run code in.
 

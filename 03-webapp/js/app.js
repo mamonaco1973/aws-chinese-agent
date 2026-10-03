@@ -386,6 +386,17 @@ async function _selectConversation(convId) {
 
   try {
     const queries = await listQueries(convId);
+    // The user may have switched again while this loaded.
+    if (convId !== _activeConvId) return;
+
+    // A conversation with no messages yet is still a new chat: show the
+    // starter questions, not an empty log. Hiding them above unconditionally
+    // made them vanish when switching back to an unused conversation.
+    if (queries.length === 0) {
+      document.getElementById("chat-log").classList.add("hidden");
+      document.getElementById("empty-state").classList.remove("hidden");
+      return;
+    }
     renderHistory(queries);
 
     // Re-attach polls for any still-pending queries
