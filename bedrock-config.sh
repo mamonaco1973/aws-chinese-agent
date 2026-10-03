@@ -41,10 +41,16 @@
 BEDROCK_MODELS=(
   "sonnet|us.anthropic.claude-sonnet-4-6|Claude Sonnet 4.6|true|true"
   "deepseek|deepseek.v3.2|DeepSeek V3.2|false|false"
+  # Qwen3 VL 235B: closest to the Sonnet experience -- it sees its own images,
+  # so show_file's self-check works. No caching.
+  "qwen3-vl|qwen.qwen3-vl-235b-a22b|Qwen3 VL 235B|true|false"
+  # Qwen3 Coder Next: best fit for "write Python, run it in the sandbox".
+  # Text-only, no caching.
+  "qwen3-coder|qwen.qwen3-coder-next|Qwen3 Coder Next|false|false"
 )
 
 # Key new conversations start on. Must be one of the keys above.
-export BEDROCK_DEFAULT="sonnet"
+export BEDROCK_DEFAULT="deepseek"
 
 
 # ==============================================================================

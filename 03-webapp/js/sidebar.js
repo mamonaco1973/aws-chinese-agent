@@ -133,6 +133,30 @@ function _buildItem(conv) {
 
   delBtn.addEventListener("click", async (e) => {
     e.stopPropagation();
+
+    // Shift- or Ctrl-click: delete every conversation (same shortcut as
+    // mycorpus-runtime). Each goes through the normal per-conversation
+    // DELETE, so each one's sandbox MicroVM is terminated too.
+    if (e.shiftKey || e.ctrlKey) {
+      const confirmed = await showConfirm(
+        "Delete all conversations",
+        "This will permanently delete all conversations and their messages."
+      );
+      if (!confirmed) return;
+      const all = [..._conversations];
+      for (const c of all) {
+        try {
+          await deleteConversation(c.conv_id);
+          _conversations = _conversations.filter(x => x.conv_id !== c.conv_id);
+          if (_onDelete) _onDelete(c.conv_id);
+        } catch (err) {
+          console.error("Failed to delete conversation", err);
+        }
+      }
+      _renderList();
+      return;
+    }
+
     const confirmed = await showConfirm(
       "Delete conversation",
       "This will permanently delete this conversation and all its messages."

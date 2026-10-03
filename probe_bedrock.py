@@ -511,7 +511,9 @@ def main():
     print()
     print("As BEDROCK_MODELS entries for bedrock-config.sh (pick your own key "
           "and label; check_env.sh probes every entry before each deploy):")
-    for mid, r in working:
+    # Alphabetical here, not fastest-first: this is the list you scan for a
+    # model by name.
+    for mid, r in sorted(working, key=lambda pair: pair[0].lower()):
         print(paste_line(mid, summaries[mid], r))
     return 0
 
