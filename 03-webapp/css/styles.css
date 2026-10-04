@@ -1092,7 +1092,9 @@ ul { list-style: none; }
   font-size: 1.73rem;
   font-weight: 700;
   margin: 0 0 4px;
-  color: #1a1a1a;
+  /* Theme colour, not a fixed near-black: the panel behind it is
+     --bg-modal, which is dark grey in dark mode. */
+  color: var(--text-primary);
 }
 
 .auth-form-desc {

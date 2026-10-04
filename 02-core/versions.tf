@@ -7,7 +7,9 @@
 # ================================================================================
 
 terraform {
-  required_version = ">= 1.5"
+  # >= 1.9: variables.tf validates default_model against var.models, and
+  # validation that refers to another variable needs Terraform 1.9.
+  required_version = ">= 1.9"
 
   required_providers {
     aws = {

@@ -20,7 +20,8 @@ this repo.
 ## Architecture
 
     01-sandbox/          MicroVM image: Terraform + image/ (Dockerfile, server.py, kernel.py, shell.sh)
-    02-core/             Backend Terraform + code/ (handler, conversations, users, worker, sandbox)
+    02-core/             Backend Terraform + code/ (handler, conversations, users, worker,
+                         sandbox, memory, models)
     03-webapp/           Vanilla-JS SPA, uploaded by apply.sh (no Terraform)
 
 ### Request flow
@@ -76,9 +77,10 @@ this repo.
   the VM id. The next message gets it as a `<sandbox_state>` block ahead of
   the question. `state_block()` only calls GetMicrovm, so it never wakes a
   suspended VM, and it reports an expired sandbox as gone.
-- **Caching:** checkpoints after the system prompt, after the replayed
-  history, and on the latest message. The budget counts cache reads at 0.1x
-  and cache writes at 1.25x (`worker.budget_tokens`).
+- **Caching** (models with `prompt_caching`, see Models): checkpoints after
+  the system prompt, after the replayed history, and on the latest message.
+  The budget counts cache reads at 0.1x and cache writes at 1.25x
+  (`worker.budget_tokens`).
 - The inventory cells must leave nothing behind: Python names start with `_`
   and are deleted; bash pipelines run in subshells. Values of exports and
   strings are never captured, because they may be secrets.
@@ -174,11 +176,35 @@ prompt caching with real calls, and prints ready-to-paste `BEDROCK_MODELS`
 lines. `check_env.sh` runs `probe_bedrock.py --check <id> --image --caching`
 on every entry, which fails a switch the model cannot honour.
 
-Probed 2026-10-02: Sonnet 4.6 supports all three. DeepSeek V3.2 calls tools
-but rejects image blocks (ValidationException) and any cachePoint
-(AccessDeniedException). Without vision it tends to make "another version"
-of what it rendered; `show_file`'s text reply tells it the request is done,
-and its leaked `<｜DSML｜function_calls` markup is stripped from text blocks.
+Configured: Claude Sonnet 4.6, DeepSeek V3.2 (default) and Qwen3 Coder Next.
+Probed 2026-10-02/03: Sonnet 4.6 supports all three. DeepSeek V3.2 and Qwen3
+Coder Next call tools but reject image blocks (ValidationException) and any
+cachePoint (AccessDeniedException). Without vision DeepSeek tends to make
+"another version" of what it rendered; `show_file`'s text reply tells it the
+request is done, and its leaked `<｜DSML｜function_calls` markup is stripped
+from text blocks.
+
+## Webapp (03-webapp)
+
+- **Model picker:** a pill in the input box's toolbar, left of send, filled
+  from `GET /models`. Disabled and showing the conversation's model once the
+  first message locks it. The last choice is remembered in localStorage.
+- **Input box:** two rows -- text on top, toolbar (model, send) pinned
+  underneath. The text grows to 40% of the window, then scrolls
+  (`_autoResize` and the CSS `max-height` share that limit). Five-line
+  minimum, three on windows under 760px tall.
+- **Live trace:** while a query runs, each poll adds new trace steps to the
+  thinking bubble (step by step, so open folds stay open). The finished
+  answer shows them folded into a "Reasoning" bar *above* the answer, with
+  tool calls, tokens and elapsed time (`created_at` to `updated_at`).
+- **Files:** raster images inline; HTML opens in a new tab -- the API signs
+  it `inline` as `text/html`, safe because the S3 link is a different origin
+  from the app; everything else (SVG included) downloads.
+- **Sidebar:** the title is refreshed right after a send (switching chats
+  drops the poll, so waiting for the answer missed it). Shift- or Ctrl-click
+  on delete removes every conversation. An empty conversation shows the
+  starter questions, not an empty log.
+- **User messages** keep their line breaks (`white-space: pre-wrap`).
 
 ## Testing Without Deploying
 
