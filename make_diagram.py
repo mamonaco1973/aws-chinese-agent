@@ -129,7 +129,7 @@ def between(a, b):
 # VARIANT -- the only section that differs from aws-agentcore-sandbox's copy
 # ------------------------------------------------------------------------------
 # The request path runs down the middle column: API -> SQS -> worker, with the
-# worker as the hub -- Claude to its left, the MicroVM below it, its results
+# worker as the hub -- the model to its left, the MicroVM below it, its results
 # climbing the right column to DynamoDB + S3, where the API polls for them.
 # Amber goes to one node only: the sandbox, the subject of the project.
 #
@@ -141,7 +141,7 @@ NODES.update({
                 "questions, traces, files, history"),
     "queue":   (COL[1], ROW[1], "blue", "inbox", "SQS", "one message per question"),
     "agent":   (COL[1], ROW[2], "blue", "zap", "Worker Lambda", "Converse tool loop, 15 min max"),
-    "model":   (COL[0], ROW[2], "purple", "bot", "Claude", "Sonnet 4.6 on Bedrock"),
+    "model":   (COL[0], ROW[2], "purple", "bot", "Model", "picked per chat, on Bedrock"),
     "sandbox": (COL[1], ROW[3], "amber", "terminal", "Lambda MicroVM",
                 "Python + bash, suspends when idle"),
 })
@@ -169,7 +169,7 @@ EDGES = {
 
 ALT = ("A web app calls an API that writes each question to DynamoDB and S3 and "
        "enqueues it on SQS; a worker Lambda runs the Converse tool loop, calling "
-       "Claude on Bedrock and running code in a per-conversation Lambda MicroVM, "
+       "the conversation's model on Bedrock and running code in a per-conversation Lambda MicroVM, "
        "and writes results back to DynamoDB and S3, which the web app polls")
 
 # ------------------------------------------------------------------------------

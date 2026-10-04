@@ -39,10 +39,9 @@ this repo.
 
 ### Why a Converse loop, not Bedrock Agents
 
-- **The model can see its own image** (when it supports image input).
-  `show_file` returns the PNG as an image block, so the model can catch a bad
-  render. Bedrock Agents action groups return text only. DeepSeek V3.2 is
-  text-only, so this is switched off for it (see Model).
+- **The model can see its own image** (on models with image input; see
+  Models). `show_file` returns the PNG as an image block, so the model can
+  catch a bad render. Bedrock Agents action groups return text only.
 - **The worker waits, not the model.** `run_code`/`run_shell` block in the worker (up to
   4 minutes, then it hands back a job id for `get_result`). The model never
   has to poll from inside its own reasoning.
